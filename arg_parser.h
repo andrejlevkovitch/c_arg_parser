@@ -355,7 +355,7 @@ inline enum ArgType typename2argtype(const char *type_name) {
          "unknown typename, supported: str, int, long, ll, double and bool");
 }
 
-char *val_to_string(union ArgUnion val, enum ArgType type) {
+inline char *val_to_string(union ArgUnion val, enum ArgType type) {
   char *retval = (char *)malloc(ARG_MAX_VALUE_LEN);
   int   count  = 0;
   switch (type) {
@@ -591,7 +591,7 @@ inline arg_parser arg_parser_make(const char *main_desc) {
   return retval;
 }
 
-void arg_parser_dispose(arg_parser *parser) {
+inline void arg_parser_dispose(arg_parser *parser) {
   for (uint i = 0; i < parser->count; ++i) {
     free(parser->alist[i].name);
     free(parser->alist[i].desc);
