@@ -168,6 +168,7 @@ int arg_parser_parse(arg_parser *parser,
  * \param type type of argument
  * \param default_val default value for argument
  * \param flags argument flags @see ArgFlags
+ * \return 0 if case of success, otherwise non zero value
  */
 #define ARG_PARSER_ADD_ARG(parser,            \
                            key,               \
@@ -311,6 +312,11 @@ int arg_parser_parse(arg_parser *parser,
                      ArgDefault)
 
 
+/**\brief return flag value
+ * \param key complete name of flag
+ * \param variable for return
+ * \return 0 in case of success, otherwise return non zero value
+ */
 #define ARG_PARSER_GET_ARG(parser, key, val, type) \
   arg_parser_get_arg(&parser,                      \
                      key,                          \
