@@ -100,7 +100,7 @@ union ArgUnion arg_union_make_from_long(long val);
 union ArgUnion arg_union_make_from_ll(long long val);
 union ArgUnion arg_union_make_from_double(double val);
 
-void *void_ptr_cast_from_str(char **val);
+void *void_ptr_cast_from_str(const char **val);
 void *void_ptr_cast_from_bool(bool *val);
 void *void_ptr_cast_from_int(int *val);
 void *void_ptr_cast_from_long(long *val);
@@ -811,7 +811,7 @@ inline union ArgUnion arg_union_make_from_double(double val) {
   return retval;
 }
 
-inline void *void_ptr_cast_from_str(char **val) {
+inline void *void_ptr_cast_from_str(const char **val) {
   return (union ArgUnion *)val;
 }
 
