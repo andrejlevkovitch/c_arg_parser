@@ -461,6 +461,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
   uint   count           = 0;
   uint   longest_fmt_arg = 0;
   uint   desc_len        = 0;
+  uint   usage_len       = 0;
   uint   retval_len      = 0;
   uint   offset          = 0;
 
@@ -517,20 +518,24 @@ inline char *arg_parser_usage(arg_parser *parser) {
     desc_len += strlen(parser->alist[i].desc);
   }
 
-  retval_len = strlen(parser->mdesc) + 1 /*new line*/ +
-               parser->count * longest_fmt_arg +
+  usage_len  = strlen(parser->mdesc);
+  usage_len  = usage_len > 0 ? usage_len + 1 /*new line*/ : 0;
+  retval_len = usage_len + parser->count * longest_fmt_arg +
                parser->count * 2 /*space and new line*/ + desc_len + 1 /*\0*/;
-  retval = (char *)malloc(retval_len);
-  memset(retval, ' ', retval_len);
+
+  retval                 = (char *)malloc(retval_len);
+  retval[retval_len - 1] = '\0';
 
 
-  offset +=
-      snprintf(retval + offset, retval_len - offset, "%s\n", parser->mdesc);
+  if (usage_len) {
+    offset +=
+        snprintf(retval + offset, retval_len - offset, "%s\n", parser->mdesc);
+  }
   for (uint i = 0; i < parser->count; ++i) {
     count =
         snprintf(retval + offset, retval_len - offset, "%s", list_fmt_args[i]);
 
-    retval[offset + count] = ' ';
+    memset(retval + offset + count, ' ', longest_fmt_arg - count);
     offset += longest_fmt_arg;
 
     offset += snprintf(retval + offset,
@@ -767,7 +772,7 @@ inline int arg_parser_get_arg(const arg_parser *parser,
             (arg->flgs & ArgFound) ? arg->rval.val_int : arg->dval.val_int;
         break;
       case ArgLong:
-        *(bool *)val =
+        *(long *)val =
             (arg->flgs & ArgFound) ? arg->rval.val_long : arg->dval.val_long;
         break;
       case ArgLongLong:
