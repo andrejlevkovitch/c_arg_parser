@@ -155,13 +155,16 @@ int arg_parser_get_args(const arg_parser *parser,
  * \return 0 if parsing was successfull, otherwise return not 0 value
  * \param ignore_not_defined_flags if false, then parsing fail if unknown flag
  * found
+ * \param remove_flags_from_argv removes all defined flags from argv except
+ * program name, positional arguments and not defined flags
  * \param err if non NULL, then parser store string with error if parsing
  * failed. NOTE: you should call free for the string after using
  */
 int arg_parser_parse(arg_parser *parser,
-                     int         argc,
-                     char *      argv[],
+                     int *       argc,
+                     char **     argv[],
                      bool        ignore_not_defined_flags,
+                     bool        remove_defined_flags_from_argv,
                      char **     err);
 
 
@@ -170,9 +173,21 @@ int arg_parser_parse(arg_parser *parser,
  * \param err pointer to c string or NULL
  * \param ignore_not_defined_flags set to false if you want to parser failed if
  * some unexpected flag founded
+ * \param remove_defined_flags_from_argv set to true if you want leave in argv
+ * only program name, positional args and not defined flags
  */
-#define ARG_PARSER_PARSE(parser, argc, argv, ignore_not_defined_flags, err) \
-  arg_parser_parse(parser, argc, argv, ignore_not_defined_flags, err)
+#define ARG_PARSER_PARSE(parser,                         \
+                         argc,                           \
+                         argv,                           \
+                         ignore_not_defined_flags,       \
+                         remove_defined_flags_from_argv, \
+                         err)                            \
+  arg_parser_parse(parser,                               \
+                   &argc,                                \
+                   &argv,                                \
+                   ignore_not_defined_flags,             \
+                   remove_defined_flags_from_argv,       \
+                   err)
 
 
 /**\brief add argument description to parser
@@ -644,19 +659,26 @@ inline void arg_parser_dispose(arg_parser *parser) {
   }
 
 inline int arg_parser_parse(arg_parser *parser,
-                            int         argc,
-                            char *      argv[],
+                            int *       argc,
+                            char **     argv[],
                             bool        ignore_not_defined_flags,
+                            bool        remove_defined_flags_from_argv,
                             char **     err) {
   char        err_buf[ARG_MAX_ERROR_LEN];
-  arg_desc *  arg    = NULL;
-  arg_rval *  val    = NULL;
-  const char *flag   = NULL;
-  const char *retval = NULL;
-  char *      endval = NULL;
+  arg_desc *  arg     = NULL;
+  arg_rval *  val     = NULL;
+  const char *flag    = NULL;
+  const char *retval  = NULL;
+  char *      endval  = NULL;
+  int         counter = 0;
 
-  for (int val_iter = 1; val_iter < argc; ++val_iter) {
-    flag = argv[val_iter];
+  for (int val_iter = 1; val_iter < *argc; val_iter += counter) {
+    counter = 1;
+    flag    = (*argv)[val_iter];
+    if (flag[0] != '-') {
+      continue; // positional arg, ignore
+    }
+
 
     bool found = false;
     for (uint arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
@@ -664,19 +686,21 @@ inline int arg_parser_parse(arg_parser *parser,
       if (arg_name_cmp(arg->name, arg->shrt, flag) == 0) {
         retval = strstr(flag, "=");
 
-        if (retval == NULL && val_iter == argc - 1 && arg->type != ArgBool) {
+        if (retval == NULL && val_iter == *argc - 1 && arg->type != ArgBool) {
           goto NoValueForFlag;
         }
 
         if (retval != NULL) {
           ++retval; // ignore `=` symbol
         } else if (arg->type != ArgBool) {
-          retval = argv[++val_iter];
+          retval = (*argv)[val_iter + 1];
+          ++counter;
         } else {
-          if (val_iter == argc - 1 || argv[val_iter + 1][0] == '-') {
+          if (val_iter == *argc - 1 || (*argv)[val_iter + 1][0] == '-') {
             retval = "true";
           } else {
-            retval = argv[++val_iter];
+            retval = (*argv)[val_iter + 1];
+            ++counter;
           }
         }
 
@@ -736,6 +760,14 @@ inline int arg_parser_parse(arg_parser *parser,
 
     if (found == false && ignore_not_defined_flags == false) {
       goto NotDefinedFlagFound;
+    }
+
+    if (remove_defined_flags_from_argv) {
+      for (int i = val_iter; i < (*argc - counter); ++i) {
+        (*argv)[i] = (*argv)[i + counter];
+      }
+      (*argc) -= counter;
+      counter = 0;
     }
   }
 

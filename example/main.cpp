@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   std::string err_str;
   char *      err = NULL;
-  ARG_PARSER_PARSE(parser, argc, argv, false, &err);
+  ARG_PARSER_PARSE(parser, argc, argv, false, false, &err);
 
   if (err) {
     err_str = err;

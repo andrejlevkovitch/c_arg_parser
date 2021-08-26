@@ -89,7 +89,7 @@ void check_arg_flags() {
 
   int argc = 13;
   // clang-format off
-  char *argv[] = {"program_name",
+  char *args[] = {"program_name",
                   "--string-req",     "string",
                   "--int-req",        "1",
                   "--long-req",       "2",
@@ -98,7 +98,8 @@ void check_arg_flags() {
                   "--bool-req",       "false",
   };
   // clang-format on
-  result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
+  char **argv = args;
+  result      = ARG_PARSER_PARSE(parser, argc, argv, false, false, NULL);
   assert(result == 0);
 
 
@@ -153,9 +154,10 @@ void check_arg_flags() {
 void check_unknown_flag_fail() {
   arg_parser *parser = arg_parser_make(NULL);
 
-  int   argc   = 2;
-  char *argv[] = {"program", "--unknown"};
-  int   result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
+  int    argc   = 2;
+  char * args[] = {"program", "--unknown"};
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, false, false, NULL);
   assert(result != 0);
 
   arg_parser_dispose(parser);
@@ -164,9 +166,10 @@ void check_unknown_flag_fail() {
 void check_unknown_flag_not_fail() {
   arg_parser *parser = arg_parser_make(NULL);
 
-  int   argc   = 2;
-  char *argv[] = {"program", "--unknown"};
-  int   result = ARG_PARSER_PARSE(parser, argc, argv, true, NULL);
+  int    argc   = 2;
+  char * args[] = {"program", "--unknown"};
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, true, false, NULL);
   assert(result == 0);
 
   arg_parser_dispose(parser);
@@ -184,7 +187,7 @@ void check_setting_short_flags() {
 
   int argc = 13;
   // clang-format off
-  char *argv[] = {"program_name",
+  char *args[] = {"program_name",
                   "-s", "string",
                   "-i", "1",
                   "-l", "2",
@@ -193,7 +196,8 @@ void check_setting_short_flags() {
                   "-b", "false",
   };
   // clang-format on
-  int result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, false, false, NULL);
   assert(result == 0);
 
   const char *str          = NULL;
@@ -227,13 +231,14 @@ void check_several_values_for_one_flag() {
 
   // clang-format off
   int argc = 7;
-  char *argv[] = {"program",
+  char *args[] = {"program",
                   "--word=alpha",
                   "--word", "bravo",
                   "-w", "charlie",
                   "-w=delta"};
   // clang-format on
-  int result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, false, false, NULL);
   assert(result == 0);
 
   int count = arg_parser_count(parser, "word");
@@ -257,11 +262,12 @@ void check_bool_arg_without_val() {
 
   // clang-format off
   int argc = 4;
-  char *argv[] = {"program",
+  char *args[] = {"program",
                   "--some-flag=some-val",
                   "-b", "--some-other-flag=some-other-value"};
   // clang-format on
-  int result = ARG_PARSER_PARSE(parser, argc, argv, true, NULL);
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, true, false, NULL);
   assert(result == 0);
 
 
@@ -269,6 +275,31 @@ void check_bool_arg_without_val() {
   result   = ARG_PARSER_GET_BOOL(parser, "bool-flag", val);
   assert(result == 1);
   assert(val == true);
+
+  arg_parser_dispose(parser);
+}
+
+void check_positional_args() {
+  arg_parser *parser = arg_parser_make(NULL);
+
+  ARG_PARSER_ADD_STR(parser, "some-flag", 0, NULL, false);
+
+  // clang-format off
+  int argc = 5;
+  char *args[] = {"program",
+                  "pos1",
+                  "--some-flag", "val",
+                  "pos2",
+  };
+  // clang-format on
+  char **argv   = args;
+  int    result = ARG_PARSER_PARSE(parser, argc, argv, false, true, NULL);
+  assert(result == 0);
+
+  assert(argc == 3);
+  assert(strcmp(argv[0], "program") == 0);
+  assert(strcmp(argv[1], "pos1") == 0);
+  assert(strcmp(argv[2], "pos2") == 0);
 
   arg_parser_dispose(parser);
 }
@@ -287,6 +318,8 @@ int main() {
 
   check_several_values_for_one_flag();
   check_bool_arg_without_val();
+
+  check_positional_args();
 
   return EXIT_SUCCESS;
 }
