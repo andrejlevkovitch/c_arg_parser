@@ -118,7 +118,7 @@ void *void_ptr_cast_from_double(double *val);
 /**\brief create instance of arg_parser
  * \param main_desc description of your program, could be a NULL
  */
-arg_parser arg_parser_make(const char *main_desc);
+arg_parser *arg_parser_make(const char *main_desc);
 
 /**\brief destroy instance of arg_parser
  */
@@ -137,12 +137,19 @@ void arg_parser_add_arg(arg_parser *   parser,
                         int            flags,
                         union ArgUnion default_val);
 
-/**\return 0 if argument founded, otherwise return non 0 value
+/**\return count of arg values with given name
  */
-int arg_parser_get_arg(const arg_parser *parser,
-                       const char *      name,
-                       enum ArgType      type,
-                       void *            val);
+int arg_parser_count(arg_parser *parser, const char *name);
+
+/**\return capacity of returned values
+ * \param count desired count of values for return associated with given flag
+ * \note val should be a pointer with allocated space not less then count
+ */
+int arg_parser_get_args(const arg_parser *parser,
+                        const char *      name,
+                        enum ArgType      type,
+                        void *            val,
+                        int               count);
 
 /**\brief parse args by parser
  * \return 0 if parsing was successfull, otherwise return not 0 value
@@ -165,7 +172,7 @@ int arg_parser_parse(arg_parser *parser,
  * some unexpected flag founded
  */
 #define ARG_PARSER_PARSE(parser, argc, argv, ignore_not_defined_flags, err) \
-  arg_parser_parse(&parser, argc, argv, ignore_not_defined_flags, err)
+  arg_parser_parse(parser, argc, argv, ignore_not_defined_flags, err)
 
 
 /**\brief add argument description to parser
@@ -184,7 +191,7 @@ int arg_parser_parse(arg_parser *parser,
                            type,              \
                            default_val,       \
                            flags)             \
-  arg_parser_add_arg(&parser,                 \
+  arg_parser_add_arg(parser,                  \
                      key,                     \
                      short_name,              \
                      description,             \
@@ -322,13 +329,14 @@ int arg_parser_parse(arg_parser *parser,
 /**\brief return flag value
  * \param key complete name of flag
  * \param variable for return
- * \return 0 in case of success, otherwise return non zero value
+ * \return 1 in case of success, otherwise return zero or less
  */
-#define ARG_PARSER_GET_ARG(parser, key, val, type) \
-  arg_parser_get_arg(&parser,                      \
-                     key,                          \
-                     typename2argtype(#type),      \
-                     void_ptr_cast_from_##type(&val))
+#define ARG_PARSER_GET_ARG(parser, key, val, type)     \
+  arg_parser_get_args(parser,                          \
+                      key,                             \
+                      typename2argtype(#type),         \
+                      void_ptr_cast_from_##type(&val), \
+                      1)
 
 #define ARG_PARSER_GET_STR(parser, key, val) \
   ARG_PARSER_GET_ARG(parser, key, val, str)
@@ -590,16 +598,19 @@ inline void arg_parser_add_arg(arg_parser *   parser,
   parser->alist[parser->asize - 1] = arg;
 }
 
-inline arg_parser arg_parser_make(const char *main_desc) {
-  char *mdesc = NULL;
+inline arg_parser *arg_parser_make(const char *main_desc) {
+  arg_parser *retval = (arg_parser *)malloc(sizeof(arg_parser));
+  retval->alist      = NULL;
+  retval->rlist      = NULL;
+  retval->asize      = 0;
+  retval->rsize      = 0;
   if (main_desc) {
-    mdesc = (char *)malloc(strlen(main_desc) + 1);
-    strcpy(mdesc, main_desc);
+    retval->mdesc = (char *)malloc(strlen(main_desc) + 1);
+    strcpy(retval->mdesc, main_desc);
   } else {
-    mdesc    = (char *)malloc(1);
-    mdesc[0] = '\0';
+    retval->mdesc    = (char *)malloc(1);
+    retval->mdesc[0] = '\0';
   }
-  arg_parser retval = {mdesc, NULL, NULL, 0, 0};
   return retval;
 }
 
@@ -616,6 +627,8 @@ inline void arg_parser_dispose(arg_parser *parser) {
   parser->rlist = NULL;
   parser->asize = 0;
   parser->rsize = 0;
+
+  free(parser);
 }
 
 
@@ -760,12 +773,28 @@ ConversionError:
   return 4;
 }
 
-inline int arg_parser_get_arg(const arg_parser *parser,
-                              const char *      name,
-                              enum ArgType      type,
-                              void *            val) {
+inline int arg_parser_count(arg_parser *parser, const char *name) {
+  int  count    = 0;
   uint name_len = strlen(name);
   for (uint i = 0; i < parser->rsize; ++i) {
+    arg_rval *  arg      = &parser->rlist[i];
+    const char *arg_name = arg->name;
+    if (strlen(arg_name) == name_len && str_arg_cmp(arg_name, name) == 0) {
+      ++count;
+    }
+  }
+
+  return count;
+}
+
+inline int arg_parser_get_args(const arg_parser *parser,
+                               const char *      name,
+                               enum ArgType      type,
+                               void *            val,
+                               int               count) {
+  int  retval   = 0;
+  uint name_len = strlen(name);
+  for (uint i = 0; i < parser->rsize && retval < count; ++i) {
     arg_rval *  arg      = &parser->rlist[i];
     const char *arg_name = arg->name;
     if (strlen(arg_name) == name_len && str_arg_cmp(arg_name, name) == 0) {
@@ -774,29 +803,30 @@ inline int arg_parser_get_arg(const arg_parser *parser,
       }
       switch (type) {
       case ArgString:
-        *(const char **)val = arg->rval.val_str;
+        *((const char **)val + retval++) = arg->rval.val_str;
         break;
       case ArgBool:
-        *(bool *)val = arg->rval.val_bool;
+        *((bool *)val + retval++) = arg->rval.val_bool;
         break;
       case ArgInt:
-        *(int *)val = arg->rval.val_int;
+        *((int *)val + retval++) = arg->rval.val_int;
         break;
       case ArgLong:
-        *(long *)val = arg->rval.val_long;
+        *((long *)val + retval++) = arg->rval.val_long;
         break;
       case ArgLongLong:
-        *(long long *)val = arg->rval.val_ll;
+        *((long long *)val + retval++) = arg->rval.val_ll;
         break;
       case ArgDouble:
-        *(double *)val = arg->rval.val_double;
+        *((double *)val + retval++) = arg->rval.val_double;
         break;
+      default:
+        assert(false && "unknown arg type");
       }
-      return 0;
     }
   }
 
-  return 2;
+  return retval;
 }
 
 

@@ -4,9 +4,9 @@
 
 
 void check_arg_parser_create_and_dispose_only_with_desc(const char *desc) {
-  arg_parser parser = arg_parser_make(desc);
-  char *     usage  = arg_parser_usage(&parser);
-  int        result = 0;
+  arg_parser *parser = arg_parser_make(desc);
+  char *      usage  = arg_parser_usage(parser);
+  int         result = 0;
   if (desc == NULL || strlen(desc) == 0) {
     result = strcmp(usage, "");
     assert(result == 0 && "non empty usage");
@@ -17,11 +17,11 @@ void check_arg_parser_create_and_dispose_only_with_desc(const char *desc) {
            "unexpected diff");
   }
   free(usage);
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
 }
 
 void check_arg_flags() {
-  arg_parser parser = arg_parser_make("main desc:");
+  arg_parser *parser = arg_parser_make("main desc:");
 
   ARG_PARSER_ADD_STR(parser, "string", 0, "not required string", false);
   ARG_PARSER_ADD_STR(parser, "string_req", 's', "required string", true);
@@ -81,7 +81,7 @@ void check_arg_flags() {
       "  -b, --bool-req               required bool\n"
       "      --bool-def (=true)       bool with default value\n";
 
-  char *usage  = arg_parser_usage(&parser);
+  char *usage  = arg_parser_usage(parser);
   int   result = strcmp(usage, target_usage);
   assert(result == 0);
   free(usage);
@@ -109,12 +109,12 @@ void check_arg_flags() {
   double      double_value = 0;
   bool        bool_value   = 0;
 
-  assert(ARG_PARSER_GET_STR(parser, "string", str) != 0);
-  assert(ARG_PARSER_GET_INT(parser, "int", int_value) != 0);
-  assert(ARG_PARSER_GET_LONG(parser, "long", long_value) != 0);
-  assert(ARG_PARSER_GET_LL(parser, "long-long", ll_value) != 0);
-  assert(ARG_PARSER_GET_DOUBLE(parser, "double", double_value) != 0);
-  assert(ARG_PARSER_GET_BOOL(parser, "bool", bool_value) != 0);
+  assert(ARG_PARSER_GET_STR(parser, "string", str) == 0);
+  assert(ARG_PARSER_GET_INT(parser, "int", int_value) == 0);
+  assert(ARG_PARSER_GET_LONG(parser, "long", long_value) == 0);
+  assert(ARG_PARSER_GET_LL(parser, "long-long", ll_value) == 0);
+  assert(ARG_PARSER_GET_DOUBLE(parser, "double", double_value) == 0);
+  assert(ARG_PARSER_GET_BOOL(parser, "bool", bool_value) == 0);
 
 
   ARG_PARSER_GET_STR(parser, "string-req", str);
@@ -147,33 +147,33 @@ void check_arg_flags() {
   assert(bool_value == true);
 
 
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
 }
 
 void check_unknown_flag_fail() {
-  arg_parser parser = arg_parser_make(NULL);
+  arg_parser *parser = arg_parser_make(NULL);
 
   int   argc   = 2;
   char *argv[] = {"program", "--unknown"};
   int   result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
   assert(result != 0);
 
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
 }
 
 void check_unknown_flag_not_fail() {
-  arg_parser parser = arg_parser_make(NULL);
+  arg_parser *parser = arg_parser_make(NULL);
 
   int   argc   = 2;
   char *argv[] = {"program", "--unknown"};
   int   result = ARG_PARSER_PARSE(parser, argc, argv, true, NULL);
   assert(result == 0);
 
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
 }
 
 void check_setting_short_flags() {
-  arg_parser parser = arg_parser_make(NULL);
+  arg_parser *parser = arg_parser_make(NULL);
 
   ARG_PARSER_ADD_STR(parser, "string", 's', "not required string", false);
   ARG_PARSER_ADD_INT(parser, "int", 'i', "not required int", false);
@@ -192,6 +192,7 @@ void check_setting_short_flags() {
                   "-d", "10.5",
                   "-b", "false",
   };
+  // clang-format on
   int result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
   assert(result == 0);
 
@@ -207,7 +208,7 @@ void check_setting_short_flags() {
   ARG_PARSER_GET_LONG(parser, "long", long_value);
   ARG_PARSER_GET_LL(parser, "long-long", ll_value);
   ARG_PARSER_GET_DOUBLE(parser, "double", double_value);
-  ARG_PARSER_GET_BOOL(parser, "bool", bool_value) ;
+  ARG_PARSER_GET_BOOL(parser, "bool", bool_value);
 
   assert(strcmp(str, "string") == 0);
   assert(int_value == 1);
@@ -216,7 +217,60 @@ void check_setting_short_flags() {
   assert(double_value > 10.4 && double_value < 10.6);
   assert(bool_value == false);
 
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
+}
+
+void check_several_values_for_one_flag() {
+  arg_parser *parser = arg_parser_make(NULL);
+
+  ARG_PARSER_ADD_STR(parser, "word", 'w', "list of words", true);
+
+  // clang-format off
+  int argc = 7;
+  char *argv[] = {"program",
+                  "--word=alpha",
+                  "--word", "bravo",
+                  "-w", "charlie",
+                  "-w=delta"};
+  // clang-format on
+  int result = ARG_PARSER_PARSE(parser, argc, argv, false, NULL);
+  assert(result == 0);
+
+  int count = arg_parser_count(parser, "word");
+  assert(count == 4);
+
+  const char *rval_arr[4];
+  arg_parser_get_args(parser, "word", ArgString, rval_arr, 4);
+
+  assert(strcmp(rval_arr[0], "alpha") == 0);
+  assert(strcmp(rval_arr[1], "bravo") == 0);
+  assert(strcmp(rval_arr[2], "charlie") == 0);
+  assert(strcmp(rval_arr[3], "delta") == 0);
+
+  arg_parser_dispose(parser);
+}
+
+void check_bool_arg_without_val() {
+  arg_parser *parser = arg_parser_make(NULL);
+
+  ARG_PARSER_ADD_BOOL(parser, "bool-flag", 'b', NULL, true);
+
+  // clang-format off
+  int argc = 4;
+  char *argv[] = {"program",
+                  "--some-flag=some-val",
+                  "-b", "--some-other-flag=some-other-value"};
+  // clang-format on
+  int result = ARG_PARSER_PARSE(parser, argc, argv, true, NULL);
+  assert(result == 0);
+
+
+  bool val = false;
+  result   = ARG_PARSER_GET_BOOL(parser, "bool-flag", val);
+  assert(result == 1);
+  assert(val == true);
+
+  arg_parser_dispose(parser);
 }
 
 int main() {
@@ -230,6 +284,9 @@ int main() {
   check_unknown_flag_not_fail();
 
   check_setting_short_flags();
+
+  check_several_values_for_one_flag();
+  check_bool_arg_without_val();
 
   return EXIT_SUCCESS;
 }

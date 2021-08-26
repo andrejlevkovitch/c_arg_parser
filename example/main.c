@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 int main(int argc, char *argv[]) {
-  arg_parser parser = arg_parser_make("description:");
+  arg_parser *parser = arg_parser_make("description:");
 
   ARG_PARSER_ADD_BOOL(parser, "help", 'h', "print usage info", false);
   ARG_PARSER_ADD_INT(parser, "some_int", 'i', "int value", true);
@@ -32,15 +32,16 @@ int main(int argc, char *argv[]) {
 
 
   char *err = NULL;
-  ARG_PARSER_PARSE(parser, argc, argv, false, &err);
+  ARG_PARSER_PARSE(parser, argc, argv, false, false, &err);
+
 
   bool need_help = false;
-  if (ARG_PARSER_GET_BOOL(parser, "help", need_help) == 0 &&
+  if (ARG_PARSER_GET_BOOL(parser, "help", need_help) == 1 &&
       need_help == true) {
-    char *usage = arg_parser_usage(&parser);
+    char *usage = arg_parser_usage(parser);
     printf("%s\n", usage);
     free(usage);
-    arg_parser_dispose(&parser);
+    arg_parser_dispose(parser);
 
     if (err) {
       free(err);
@@ -51,7 +52,7 @@ int main(int argc, char *argv[]) {
   if (err) {
     printf("fail parsing args: %s\n", err);
     free(err);
-    arg_parser_dispose(&parser);
+    arg_parser_dispose(parser);
     return EXIT_FAILURE;
   }
 
@@ -61,6 +62,6 @@ int main(int argc, char *argv[]) {
   printf("%f\n", dval);
 
 
-  arg_parser_dispose(&parser);
+  arg_parser_dispose(parser);
   return EXIT_SUCCESS;
 }
