@@ -71,17 +71,24 @@ typedef struct _arg_desc {
   char *         name; // argument name (without first --)
   char *         desc; // description
   union ArgUnion dval; // default value
-  union ArgUnion rval; // return value
   enum ArgType   type; // arg type
   int            flgs; // arg flags
   char           shrt; // short name
 } arg_desc;
 
+typedef struct _arg_rval {
+  char *         name;
+  union ArgUnion rval;
+  enum ArgType   type;
+} arg_rval;
+
 
 typedef struct _arg_parser {
   char *    mdesc; // main description
   arg_desc *alist; // list of described args
-  uint      count; // count of described args
+  arg_rval *rlist; // list with return values
+  uint      asize; // count of described args
+  uint      rsize; // count of return values
 } arg_parser;
 
 
@@ -465,12 +472,12 @@ inline char *arg_parser_usage(arg_parser *parser) {
   uint   retval_len      = 0;
   uint   offset          = 0;
 
-  list_fmt_args = (char **)malloc(sizeof(char *) * parser->count);
-  for (uint i = 0; i < parser->count; ++i) {
+  list_fmt_args = (char **)malloc(sizeof(char *) * parser->asize);
+  for (uint i = 0; i < parser->asize; ++i) {
     list_fmt_args[i] = (char *)malloc(ARG_MAX_FMT_ARG_LEN);
   }
 
-  for (uint i = 0; i < parser->count; ++i) {
+  for (uint i = 0; i < parser->asize; ++i) {
     arg_desc *  arg      = &parser->alist[i];
     const char *arg_name = arg->name;
     if (parser->alist[i].shrt && arg->flgs & ArgDefault) {
@@ -509,7 +516,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
   }
 
 
-  for (uint i = 0; i < parser->count; ++i) {
+  for (uint i = 0; i < parser->asize; ++i) {
     count = strlen(list_fmt_args[i]);
     if (longest_fmt_arg < count) {
       longest_fmt_arg = count;
@@ -520,8 +527,8 @@ inline char *arg_parser_usage(arg_parser *parser) {
 
   usage_len  = strlen(parser->mdesc);
   usage_len  = usage_len > 0 ? usage_len + 1 /*new line*/ : 0;
-  retval_len = usage_len + parser->count * longest_fmt_arg +
-               parser->count * 2 /*space and new line*/ + desc_len + 1 /*\0*/;
+  retval_len = usage_len + parser->asize * longest_fmt_arg +
+               parser->asize * 2 /*space and new line*/ + desc_len + 1 /*\0*/;
 
   retval                 = (char *)malloc(retval_len);
   retval[retval_len - 1] = '\0';
@@ -531,7 +538,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
     offset +=
         snprintf(retval + offset, retval_len - offset, "%s\n", parser->mdesc);
   }
-  for (uint i = 0; i < parser->count; ++i) {
+  for (uint i = 0; i < parser->asize; ++i) {
     count =
         snprintf(retval + offset, retval_len - offset, "%s", list_fmt_args[i]);
 
@@ -548,7 +555,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
   }
 
 
-  for (uint i = 0; i < parser->count; ++i) {
+  for (uint i = 0; i < parser->asize; ++i) {
     free(list_fmt_args[i]);
   }
   free(list_fmt_args);
@@ -565,9 +572,8 @@ inline void arg_parser_add_arg(arg_parser *   parser,
                                enum ArgType   type,
                                int            flags,
                                union ArgUnion default_val) {
-  ++parser->count;
   parser->alist =
-      (arg_desc *)realloc(parser->alist, sizeof(arg_desc) * parser->count);
+      (arg_desc *)realloc(parser->alist, sizeof(arg_desc) * ++parser->asize);
 
   char *desc_copy;
   if (desc) {
@@ -578,15 +584,10 @@ inline void arg_parser_add_arg(arg_parser *   parser,
     desc_copy[0] = '\0';
   }
 
-  arg_desc arg = {str_to_arg_name(name),
-                  desc_copy,
-                  default_val,
-                  {},
-                  type,
-                  flags,
-                  short_name};
+  arg_desc arg =
+      {str_to_arg_name(name), desc_copy, default_val, type, flags, short_name};
 
-  parser->alist[parser->count - 1] = arg;
+  parser->alist[parser->asize - 1] = arg;
 }
 
 inline arg_parser arg_parser_make(const char *main_desc) {
@@ -598,20 +599,23 @@ inline arg_parser arg_parser_make(const char *main_desc) {
     mdesc    = (char *)malloc(1);
     mdesc[0] = '\0';
   }
-  arg_parser retval = {mdesc, NULL, 0};
+  arg_parser retval = {mdesc, NULL, NULL, 0, 0};
   return retval;
 }
 
 inline void arg_parser_dispose(arg_parser *parser) {
-  for (uint i = 0; i < parser->count; ++i) {
+  for (uint i = 0; i < parser->asize; ++i) {
     free(parser->alist[i].name);
     free(parser->alist[i].desc);
   }
   free(parser->mdesc);
   free(parser->alist);
+  free(parser->rlist);
   parser->mdesc = 0;
   parser->alist = NULL;
-  parser->count = 0;
+  parser->rlist = NULL;
+  parser->asize = 0;
+  parser->rsize = 0;
 }
 
 
@@ -633,6 +637,7 @@ inline int arg_parser_parse(arg_parser *parser,
                             char **     err) {
   char        err_buf[ARG_MAX_ERROR_LEN];
   arg_desc *  arg    = NULL;
+  arg_rval *  val    = NULL;
   const char *flag   = NULL;
   const char *retval = NULL;
   char *      endval = NULL;
@@ -641,7 +646,7 @@ inline int arg_parser_parse(arg_parser *parser,
     flag = argv[val_iter];
 
     bool found = false;
-    for (uint arg_iter = 0; arg_iter < parser->count; ++arg_iter) {
+    for (uint arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
       arg = &parser->alist[arg_iter];
       if (arg_name_cmp(arg->name, arg->shrt, flag) == 0) {
         retval = strstr(flag, "=");
@@ -662,42 +667,48 @@ inline int arg_parser_parse(arg_parser *parser,
           }
         }
 
+        parser->rlist = (arg_rval *)realloc(parser->rlist,
+                                            sizeof(arg_rval) * ++parser->rsize);
+        val           = &parser->rlist[parser->rsize - 1];
+        val->name     = arg->name;
+        val->type     = arg->type;
+
         switch (arg->type) {
         case ArgString:
-          arg->rval.val_str = retval;
+          val->rval.val_str = retval;
           break;
         case ArgBool:
           if (strcmp(retval, "true") == 0) {
-            arg->rval.val_bool = true;
+            val->rval.val_bool = true;
           } else if (strcmp(retval, "false") == 0) {
-            arg->rval.val_bool = false;
+            val->rval.val_bool = false;
           } else {
-            arg->rval.val_bool = strtol(retval, &endval, 0);
+            val->rval.val_bool = strtol(retval, &endval, 0);
             if (endval != retval + strlen(retval)) {
               goto ConversionError;
             }
           }
           break;
         case ArgInt:
-          arg->rval.val_int = strtol(retval, &endval, 0);
+          val->rval.val_int = strtol(retval, &endval, 0);
           if (endval != retval + strlen(retval)) {
             goto ConversionError;
           }
           break;
         case ArgLong:
-          arg->rval.val_long = strtol(retval, &endval, 0);
+          val->rval.val_long = strtol(retval, &endval, 0);
           if (endval != retval + strlen(retval)) {
             goto ConversionError;
           }
           break;
         case ArgLongLong:
-          arg->rval.val_ll = strtoll(retval, &endval, 0);
+          val->rval.val_ll = strtoll(retval, &endval, 0);
           if (endval != retval + strlen(retval)) {
             goto ConversionError;
           }
           break;
         case ArgDouble:
-          arg->rval.val_double = strtod(retval, &endval);
+          val->rval.val_double = strtod(retval, &endval);
           if (endval != retval + strlen(retval)) {
             goto ConversionError;
           }
@@ -715,10 +726,16 @@ inline int arg_parser_parse(arg_parser *parser,
     }
   }
 
-  for (uint arg_iter = 0; arg_iter < parser->count; ++arg_iter) {
+  for (uint arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
     arg = &parser->alist[arg_iter];
     if ((arg->flgs & ArgFound) == 0) {
-      if (arg->flgs & ArgRequired) {
+      if (arg->flgs & ArgDefault) {
+        parser->rlist = (arg_rval *)realloc(parser->rlist,
+                                            sizeof(arg_rval) * ++parser->rsize);
+        parser->rlist[parser->rsize - 1].name = arg->name;
+        parser->rlist[parser->rsize - 1].type = arg->type;
+        parser->rlist[parser->rsize - 1].rval = arg->dval;
+      } else if (arg->flgs & ArgRequired) {
         goto FlagNotFound;
       }
     }
@@ -748,47 +765,38 @@ inline int arg_parser_get_arg(const arg_parser *parser,
                               enum ArgType      type,
                               void *            val) {
   uint name_len = strlen(name);
-  for (uint i = 0; i < parser->count; ++i) {
-    arg_desc *  arg      = &parser->alist[i];
+  for (uint i = 0; i < parser->rsize; ++i) {
+    arg_rval *  arg      = &parser->rlist[i];
     const char *arg_name = arg->name;
     if (strlen(arg_name) == name_len && str_arg_cmp(arg_name, name) == 0) {
       if (type != arg->type) {
         return 1;
       }
-      if ((arg->flgs & (ArgFound | ArgDefault)) == 0) {
-        return 2;
-      }
       switch (type) {
       case ArgString:
-        *(const char **)val =
-            (arg->flgs & ArgFound) ? arg->rval.val_str : arg->dval.val_str;
+        *(const char **)val = arg->rval.val_str;
         break;
       case ArgBool:
-        *(bool *)val =
-            (arg->flgs & ArgFound) ? arg->rval.val_bool : arg->dval.val_bool;
+        *(bool *)val = arg->rval.val_bool;
         break;
       case ArgInt:
-        *(int *)val =
-            (arg->flgs & ArgFound) ? arg->rval.val_int : arg->dval.val_int;
+        *(int *)val = arg->rval.val_int;
         break;
       case ArgLong:
-        *(long *)val =
-            (arg->flgs & ArgFound) ? arg->rval.val_long : arg->dval.val_long;
+        *(long *)val = arg->rval.val_long;
         break;
       case ArgLongLong:
-        *(long long *)val =
-            (arg->flgs & ArgFound) ? arg->rval.val_ll : arg->dval.val_ll;
+        *(long long *)val = arg->rval.val_ll;
         break;
       case ArgDouble:
-        *(double *)val = (arg->flgs & ArgFound) ? arg->rval.val_double
-                                                : arg->dval.val_double;
+        *(double *)val = arg->rval.val_double;
         break;
       }
       return 0;
     }
   }
 
-  return 3;
+  return 2;
 }
 
 
