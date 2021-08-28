@@ -389,6 +389,7 @@ inline enum ArgType typename2argtype(const char *type_name) {
 
   assert(0 &&
          "unknown typename, supported: str, int, long, ll, double and bool");
+  return ArgString;
 }
 
 inline char *val_to_string(union ArgUnion val, enum ArgType type) {
