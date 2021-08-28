@@ -863,32 +863,38 @@ inline int arg_parser_get_args(const arg_parser *parser,
 
 
 inline union ArgUnion arg_union_make_from_str(const char *val) {
-  union ArgUnion retval = {.val_str = val};
+  union ArgUnion retval;
+  retval.val_str = val;
   return retval;
 }
 
 inline union ArgUnion arg_union_make_from_bool(bool val) {
-  union ArgUnion retval = {.val_bool = val};
+  union ArgUnion retval;
+  retval.val_bool = val;
   return retval;
 }
 
 inline union ArgUnion arg_union_make_from_int(int val) {
-  union ArgUnion retval = {.val_int = val};
+  union ArgUnion retval;
+  retval.val_int = val;
   return retval;
 }
 
 inline union ArgUnion arg_union_make_from_long(long val) {
-  union ArgUnion retval = {.val_long = val};
+  union ArgUnion retval;
+  retval.val_long = val;
   return retval;
 }
 
 inline union ArgUnion arg_union_make_from_ll(long long val) {
-  union ArgUnion retval = {.val_ll = val};
+  union ArgUnion retval;
+  retval.val_ll = val;
   return retval;
 }
 
 inline union ArgUnion arg_union_make_from_double(double val) {
-  union ArgUnion retval = {.val_double = val};
+  union ArgUnion retval;
+  retval.val_double = val;
   return retval;
 }
 
