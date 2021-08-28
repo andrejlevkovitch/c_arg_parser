@@ -51,9 +51,9 @@ enum ArgType {
 };
 enum ArgFlags {
   ArgNone     = 0,
-  ArgDefault  = 0b001,
-  ArgRequired = 0b010,
-  ArgFound    = 0b100,
+  ArgDefault  = 1 << 0,
+  ArgRequired = 1 << 1,
+  ArgFound    = 1 << 2,
 };
 
 
