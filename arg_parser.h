@@ -87,8 +87,8 @@ typedef struct _arg_parser {
   char *    mdesc; // main description
   arg_desc *alist; // list of described args
   arg_rval *rlist; // list with return values
-  uint      asize; // count of described args
-  uint      rsize; // count of return values
+  unsigned  asize; // count of described args
+  unsigned  rsize; // count of return values
 } arg_parser;
 
 
@@ -425,10 +425,10 @@ inline char *val_to_string(union ArgUnion val, enum ArgType type) {
 }
 
 inline char *str_to_arg_name(const char *name) {
-  uint  len    = strlen(name);
-  char *retval = (char *)malloc(len + 1);
+  unsigned len    = strlen(name);
+  char *   retval = (char *)malloc(len + 1);
   strcpy(retval, name);
-  for (uint i = 0; i < len; ++i) {
+  for (unsigned i = 0; i < len; ++i) {
     if ('_' == retval[i]) {
       retval[i] = '-';
       continue;
@@ -439,7 +439,7 @@ inline char *str_to_arg_name(const char *name) {
 }
 
 inline int str_arg_cmp(const char *lhs, const char *rhs) {
-  for (uint i = 0; i < strlen(lhs) && i < strlen(rhs); ++i) {
+  for (unsigned i = 0; i < strlen(lhs) && i < strlen(rhs); ++i) {
     char lhs_c = tolower(lhs[i]);
     char rhs_c = tolower(rhs[i]);
     if (lhs_c == '_') {
@@ -459,8 +459,8 @@ inline int str_arg_cmp(const char *lhs, const char *rhs) {
 
 inline int
 arg_name_cmp(const char *arg_name, char short_name, const char *val_for_comp) {
-  uint arg_len = strlen(arg_name);
-  uint val_len = strlen(val_for_comp);
+  unsigned arg_len = strlen(arg_name);
+  unsigned val_len = strlen(val_for_comp);
 
   if (val_len >= 2 && val_for_comp[0] == '-' && val_for_comp[1] == short_name &&
       (val_len == 2 || val_for_comp[2] == '=')) {
@@ -487,21 +487,21 @@ arg_name_cmp(const char *arg_name, char short_name, const char *val_for_comp) {
 }
 
 inline char *arg_parser_usage(arg_parser *parser) {
-  char **list_fmt_args   = NULL;
-  char * retval          = NULL;
-  uint   count           = 0;
-  uint   longest_fmt_arg = 0;
-  uint   desc_len        = 0;
-  uint   usage_len       = 0;
-  uint   retval_len      = 0;
-  uint   offset          = 0;
+  char **  list_fmt_args   = NULL;
+  char *   retval          = NULL;
+  unsigned count           = 0;
+  unsigned longest_fmt_arg = 0;
+  unsigned desc_len        = 0;
+  unsigned usage_len       = 0;
+  unsigned retval_len      = 0;
+  unsigned offset          = 0;
 
   list_fmt_args = (char **)malloc(sizeof(char *) * parser->asize);
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     list_fmt_args[i] = (char *)malloc(ARG_MAX_FMT_ARG_LEN);
   }
 
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     arg_desc *  arg      = &parser->alist[i];
     const char *arg_name = arg->name;
     if (parser->alist[i].shrt && arg->flgs & ArgDefault) {
@@ -540,7 +540,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
   }
 
 
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     count = strlen(list_fmt_args[i]);
     if (longest_fmt_arg < count) {
       longest_fmt_arg = count;
@@ -562,7 +562,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
     offset +=
         snprintf(retval + offset, retval_len - offset, "%s\n", parser->mdesc);
   }
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     count =
         snprintf(retval + offset, retval_len - offset, "%s", list_fmt_args[i]);
 
@@ -579,7 +579,7 @@ inline char *arg_parser_usage(arg_parser *parser) {
   }
 
 
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     free(list_fmt_args[i]);
   }
   free(list_fmt_args);
@@ -631,7 +631,7 @@ inline arg_parser *arg_parser_make(const char *main_desc) {
 }
 
 inline void arg_parser_dispose(arg_parser *parser) {
-  for (uint i = 0; i < parser->asize; ++i) {
+  for (unsigned i = 0; i < parser->asize; ++i) {
     free(parser->alist[i].name);
     free(parser->alist[i].desc);
   }
@@ -682,7 +682,7 @@ inline int arg_parser_parse(arg_parser *parser,
 
 
     bool found = false;
-    for (uint arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
+    for (unsigned arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
       arg = &parser->alist[arg_iter];
       if (arg_name_cmp(arg->name, arg->shrt, flag) == 0) {
         retval = strstr(flag, "=");
@@ -772,7 +772,7 @@ inline int arg_parser_parse(arg_parser *parser,
     }
   }
 
-  for (uint arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
+  for (unsigned arg_iter = 0; arg_iter < parser->asize; ++arg_iter) {
     arg = &parser->alist[arg_iter];
     if ((arg->flgs & ArgFound) == 0) {
       if (arg->flgs & ArgDefault) {
@@ -807,9 +807,9 @@ ConversionError:
 }
 
 inline int arg_parser_count(arg_parser *parser, const char *name) {
-  int  count    = 0;
-  uint name_len = strlen(name);
-  for (uint i = 0; i < parser->rsize; ++i) {
+  int      count    = 0;
+  unsigned name_len = strlen(name);
+  for (unsigned i = 0; i < parser->rsize; ++i) {
     arg_rval *  arg      = &parser->rlist[i];
     const char *arg_name = arg->name;
     if (strlen(arg_name) == name_len && str_arg_cmp(arg_name, name) == 0) {
@@ -825,9 +825,9 @@ inline int arg_parser_get_args(const arg_parser *parser,
                                enum ArgType      type,
                                void *            val,
                                int               count) {
-  int  retval   = 0;
-  uint name_len = strlen(name);
-  for (uint i = 0; i < parser->rsize && retval < count; ++i) {
+  int      retval   = 0;
+  unsigned name_len = strlen(name);
+  for (unsigned i = 0; i < parser->rsize && retval < count; ++i) {
     arg_rval *  arg      = &parser->rlist[i];
     const char *arg_name = arg->name;
     if (strlen(arg_name) == name_len && str_arg_cmp(arg_name, name) == 0) {
